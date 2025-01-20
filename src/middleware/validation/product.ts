@@ -112,3 +112,13 @@ export const validateUpdateProductRequest = [
   body("rating.*.star").isInt({ min: 0 }).withMessage("Valid rate required"),
   handleValidationErrors,
 ];
+
+export const validateProductRateRequest = [
+  body("rate").isInt({ min: 0 }).withMessage("Valid rate required"),
+  body("comment")
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage("Comment is required"),
+  handleValidationErrors,
+];

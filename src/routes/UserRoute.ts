@@ -42,4 +42,6 @@ router.post(
   UserController.resetPassword
 );
 
+router.put("/wishlist", jwtParse, UserController.addToWhishlist);
+
 export default router;

@@ -47,9 +47,14 @@ const productSchema = new mongoose.Schema(
     rating: [
       {
         star: Number,
+        comment: String,
         postBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       },
     ],
+    avarageRate: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import User from "../model/user";
 import crypto from "crypto";
 import sendResetPasswordEmail, { EmailData } from "./EmailController";
+import mongoose from "mongoose";
+import Product from "../model/product";
 
 const getCurrentUser = async (req: Request, res: Response) => {
   try {
@@ -136,6 +138,44 @@ const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+const addToWhishlist = async (req: Request, res: Response) => {
+  const userId = req.userId;
+  const { productId } = req.body;
+  const user = await User.findById(userId);
+
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const isValidId = mongoose.isValidObjectId(productId);
+
+  if (!isValidId) {
+    return res.status(400).json({ message: "Invalid product id" });
+  }
+  const existingProduct = user.whishList.find(
+    (id) => id.toString() === productId
+  );
+  let updatedUser;
+
+  if (existingProduct) {
+    updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: { whishList: productId },
+      },
+      { new: true }
+    );
+  } else {
+    updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $push: { whishList: productId },
+      },
+      { new: true }
+    );
+  }
+  res.status(200).json(updatedUser);
+};
+
 export default {
   getCurrentUser,
   deleteCurrentUser,
@@ -143,4 +183,5 @@ export default {
   updateUserPassword,
   forgotPassword,
   resetPassword,
+  addToWhishlist,
 };
