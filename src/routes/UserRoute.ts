@@ -1,47 +1,10 @@
-// import express from "express";
-// import UserController from "../controller/UserController";
-// import {
-//   validateForgotPasswordRequest,
-//   validateResetPasswordRequest,
-//   validateUpdatePasswordRequest,
-//   validateUserUpdateRequest,
-// } from "../middleware/validation/user";
-// import { jwtParse } from "../middleware/auth/auth";
+import express from "express";
 
-// const router = express.Router();
+import UserController from "../controller/UserController";
+import { validateGetUserRequest } from "../middleware/validation/user";
 
-// router.get("/", jwtParse, UserController.getCurrentUser);
+const router = express.Router();
 
-// router.delete("/", jwtParse, UserController.deleteCurrentUser);
+router.post("/", validateGetUserRequest, UserController.getCurrentUser);
 
-// router.put(
-//   "/",
-//   jwtParse,
-//   validateUserUpdateRequest,
-//   UserController.updateCurrentUser
-// );
-
-// router.put(
-//   "/password",
-//   jwtParse,
-//   validateUpdatePasswordRequest,
-//   UserController.updateUserPassword
-// );
-
-// router.post(
-//   "/forgot-password",
-//   jwtParse,
-//   validateForgotPasswordRequest,
-//   UserController.forgotPassword
-// );
-
-// router.post(
-//   "/reset-password/:token",
-//   jwtParse,
-//   validateResetPasswordRequest,
-//   UserController.resetPassword
-// );
-
-// router.put("/wishlist", jwtParse, UserController.addToWhishlist);
-
-// export default router;
+export default router;
