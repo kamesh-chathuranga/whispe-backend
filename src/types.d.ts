@@ -1,3 +1,5 @@
-export declare global {
-  var onlineUsers: Map<string, string>;
-}
+// export {};
+
+// declare global {
+//   var onlineUsers: Map<string, string>;
+// }

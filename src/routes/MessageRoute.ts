@@ -5,4 +5,6 @@ const router = express.Router();
 
 router.post("/new", MessageController.createMessage);
 
+router.get("/all/:from/:to", MessageController.getAllUserMessages);
+
 export default router;
