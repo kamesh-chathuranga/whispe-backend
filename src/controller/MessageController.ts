@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { onlineUsers } from "..";
 
 const createMessage = async (req: Request, res: Response) => {
   try {
@@ -9,7 +8,7 @@ const createMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid request" });
     }
 
-    const isOnlineUser = onlineUsers.get(to);
+    // const isOnlineUser = onlineUsers.get(to);
     // const newMessage = await prisma.message.create({
     //   data: {
     //     message,

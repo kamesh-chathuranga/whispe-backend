@@ -1,21 +1,25 @@
 import { Request, Response } from "express";
-import { prisma } from "../utils/PrismaClient";
+import User from "../model/UserModel";
 
-const getCurrentUser = async (req: Request, res: Response) => {
+const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    // Assume req.user is set by auth middleware
+    const currentUserId = req.userId;
+    if (!currentUserId) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-    res.status(200).json(user);
+
+    // Find all users except the current user.
+    const users = await User.find({ _id: { $ne: currentUserId } });
+    return res.status(200).json(users);
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Failed to get user" });
+    console.error("Error fetching users:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error while fetching users" });
   }
 };
 
 export default {
-  getCurrentUser,
+  getAllUsers,
 };
