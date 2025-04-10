@@ -1,25 +1,41 @@
 import { Request, Response } from "express";
 import User from "../model/UserModel";
 
-const getAllUsers = async (req: Request, res: Response) => {
+const getUserById = async (req: Request, res: Response) => {
   try {
-    // Assume req.user is set by auth middleware
-    const currentUserId = req.userId;
-    if (!currentUserId) {
+    const { userId } = req.params;
+    if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Find all users except the current user.
-    const users = await User.find({ _id: { $ne: currentUserId } });
+    const user = await User.findById(userId).select("-password -__v");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to fetch user" });
+  }
+};
+
+const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const users = await User.find({ _id: { $ne: userId } });
     return res.status(200).json(users);
   } catch (error) {
-    console.error("Error fetching users:", error);
-    return res
-      .status(500)
-      .json({ message: "Server error while fetching users" });
+    console.error(error);
+    return res.status(500).json({ message: "Failed to fetch users" });
   }
 };
 
 export default {
   getAllUsers,
+  getUserById,
 };
