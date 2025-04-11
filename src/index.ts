@@ -1,22 +1,11 @@
-import express from "express";
-import cors from "cors";
 import "dotenv/config";
-import { connectMongoDB } from "./config/dbConfig";
-
-import UserRoute from "./routes/UserRoute";
-import MessageRoute from "./routes/MessageRoute";
+import { connectToMongoDB } from "./config/mongodbConfig";
+import app from "./app";
 
 const PORT = process.env.PORT || 4000;
-connectMongoDB();
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+connectToMongoDB();
 
-app.use("/api/users", UserRoute);
-
-app.use("/api/message", MessageRoute);
-
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server started at port: ${PORT}`);
 });

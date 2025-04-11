@@ -28,7 +28,10 @@ const getUserById = async (req: Request, res: Response) => {
 
 const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const { userId } = req.body;
+    const  userId  = req.body;
+
+    console.log("User ID:", userId);
+    
 
     if (!isValidObjectId(userId)) {
       return res.status(400).json({ message: "Invalid user ID" });
