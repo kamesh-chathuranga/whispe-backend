@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   avatarUrl?: string;
   isOnline: boolean;
   lastSeen: Date;
@@ -23,7 +23,6 @@ const userSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
     },
     avatarUrl: {
       type: String,
@@ -46,4 +45,5 @@ const userSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-export default mongoose.model<IUser>("User", userSchema);
+export const User =
+  mongoose.models.User ?? mongoose.model<IUser>("User", userSchema);

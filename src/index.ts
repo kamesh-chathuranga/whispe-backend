@@ -13,7 +13,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/usesr", UserRoute);
+app.use("/api/users", UserRoute);
 
 app.use("/api/message", MessageRoute);
 

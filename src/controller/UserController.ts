@@ -1,9 +1,15 @@
 import { Request, Response } from "express";
-import User from "../model/UserModel";
+import { User } from "../model/UserModel";
+import { isValidObjectId } from "mongoose";
 
 const getUserById = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -23,6 +29,11 @@ const getUserById = async (req: Request, res: Response) => {
 const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { userId } = req.body;
+
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
