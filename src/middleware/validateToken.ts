@@ -15,27 +15,26 @@ export const jwtParse = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { authorization } = req.headers;
+  const cookies = req.cookies;
 
-  if (!authorization || !authorization.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Access token not found" });
+  if (!cookies || !cookies.access_token) {
+    return res.status(401).json({ message: "VALID_TOKEN_NOT_FOUND--" });
   }
-  const token = authorization.split(" ")[1];
 
   try {
     const SECRET = process.env.JWT_ACCESS_TOKEN_SECRET as string;
-    const decode = jwt.verify(token, SECRET) as jwt.JwtPayload;
+    const decode = jwt.verify(cookies.access_token, SECRET) as jwt.JwtPayload;
     const userId = decode.userId;
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(401).json({ message: "Unauthorized" });
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     req.userId = user._id.toString();
     next();
   } catch (error) {
     console.log(error);
-    res.status(401).json({ message: "Invalid or expired token" });
+    res.status(401).json({ message: "VALID_TOKEN_NOT_FOUND" });
   }
 };

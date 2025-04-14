@@ -4,9 +4,9 @@ import { User } from "../model/UserModel";
 import { generateJWTToken } from "../util/jwtService";
 import { decryptData, encryptData } from "../util/encryptionService";
 import {
-  clearRefreshTokenFromCookie,
-  setRefreshTokenInCookie,
-} from "../util/cookieHelper";
+  clearAuthTokenFromCookie,
+  setAuthTokenInCookie,
+} from "../util/cookie";
 
 const registerCurrentUser = async (req: Request, res: Response) => {
   try {
@@ -61,9 +61,10 @@ const logInCurrentUser = async (req: Request, res: Response) => {
 
     await foundUser.save();
 
-    setRefreshTokenInCookie(res, encryptedRefreshToken);
+    clearAuthTokenFromCookie(res);
+    setAuthTokenInCookie(res, accessToken, encryptedRefreshToken);
 
-    res.status(200).json({ user: foundUser.toJSON(), accessToken });
+    res.status(200).json(foundUser.toJSON());
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Failed to login user" });
@@ -74,18 +75,18 @@ const logOutCurrentUser = async (req: Request, res: Response) => {
   try {
     const cookie = req.cookies;
 
-    if (!cookie || !cookie.refreshToken) {
+    if (!cookie || !cookie.refresh_token) {
       return res.status(401).json({ message: "Refresh token required" });
     }
 
-    const refreshToken = cookie.refreshToken;
+    const refreshToken = cookie.refresh_token;
     const user = await User.findOne({ refreshToken });
 
     if (!user) {
       return res.status(403).json({ message: "Invalid refresh token" });
     }
 
-    clearRefreshTokenFromCookie(res);
+    clearAuthTokenFromCookie(res);
 
     user.refreshToken = null;
     await user.save();
@@ -123,7 +124,11 @@ const validateRefreshToken = async (req: Request, res: Response) => {
       }
 
       const accessToken = generateJWTToken(userId, user.email, "ACCESS");
-      res.status(200).json({ accessToken });
+
+      clearAuthTokenFromCookie(res);
+      setAuthTokenInCookie(res, accessToken, encryRefreshToken);
+
+      res.status(200);
     });
   } catch (error) {
     console.log(error);

@@ -4,6 +4,7 @@ import {
   validateUserLoginRequest,
   validateUserRegisterRequest,
 } from "../middleware/validation/auth-validation";
+import { jwtParse } from "../middleware/validateToken";
 
 const authRouter = Router();
 
@@ -18,5 +19,9 @@ authRouter.post(
   validateUserRegisterRequest,
   AuthController.registerCurrentUser
 );
+
+authRouter.post("/logout", jwtParse, AuthController.logOutCurrentUser);
+
+authRouter.get("/refresh", AuthController.validateRefreshToken);
 
 export default authRouter;
