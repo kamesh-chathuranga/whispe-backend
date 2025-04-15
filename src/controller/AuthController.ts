@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../model/UserModel";
 import { generateJWTToken } from "../util/jwtService";
-import { decryptData, encryptData } from "../util/encryptionService";
 import {
-  clearAuthTokenFromCookie,
-  setAuthTokenInCookie,
-} from "../util/cookie";
+  decryptRefreshToken,
+  encryptRefreshToken,
+} from "../util/encryptionService";
+import { clearAuthTokenFromCookie, setAuthTokenInCookie } from "../util/cookie";
 
 const registerCurrentUser = async (req: Request, res: Response) => {
   try {
@@ -56,15 +56,15 @@ const logInCurrentUser = async (req: Request, res: Response) => {
       email,
       "REFRESH"
     );
-    const encryptedRefreshToken = encryptData(refreshToken);
+    const encryptedRefreshToken = encryptRefreshToken(refreshToken);
     foundUser.refreshToken = encryptedRefreshToken;
 
     await foundUser.save();
 
     clearAuthTokenFromCookie(res);
-    setAuthTokenInCookie(res, accessToken, encryptedRefreshToken);
+    setAuthTokenInCookie(res, encryptedRefreshToken, accessToken);
 
-    res.status(200).json(foundUser.toJSON());
+    res.status(200).json({ ...foundUser.toJSON() });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Failed to login user" });
@@ -75,11 +75,11 @@ const logOutCurrentUser = async (req: Request, res: Response) => {
   try {
     const cookie = req.cookies;
 
-    if (!cookie || !cookie.refresh_token) {
+    if (!cookie || !cookie.refreshToken) {
       return res.status(401).json({ message: "Refresh token required" });
     }
 
-    const refreshToken = cookie.refresh_token;
+    const refreshToken = cookie.refreshToken;
     const user = await User.findOne({ refreshToken });
 
     if (!user) {
@@ -101,37 +101,40 @@ const logOutCurrentUser = async (req: Request, res: Response) => {
 const validateRefreshToken = async (req: Request, res: Response) => {
   try {
     const cookie = req.cookies;
+    const encryRefreshToken = cookie.refreshToken;
 
-    if (!cookie || !cookie.refreshToken) {
+    if (!cookie || !encryRefreshToken) {
       return res.status(401).json({ message: "Refresh token required" });
     }
 
-    const encryRefreshToken = cookie.refreshToken;
     const user = await User.findOne({ refreshToken: encryRefreshToken });
 
     if (!user) {
+      clearAuthTokenFromCookie(res);
       return res.status(403).json({ message: "Invalid refresh token" });
     }
 
-    const refreshToken = decryptData(encryRefreshToken);
-
+    const refreshToken = decryptRefreshToken(encryRefreshToken);
     const SECRET = process.env.JWT_REFRESH_TOKEN_SECRET as string;
+
     jwt.verify(refreshToken, SECRET, (error: any, decoded: any) => {
       const userId = user._id.toString();
 
       if (error || decoded.userId !== userId) {
+        clearAuthTokenFromCookie(res);
         return res.status(403).json({ message: "Invalid refresh token" });
       }
 
       const accessToken = generateJWTToken(userId, user.email, "ACCESS");
 
       clearAuthTokenFromCookie(res);
-      setAuthTokenInCookie(res, accessToken, encryRefreshToken);
+      setAuthTokenInCookie(res, encryRefreshToken, accessToken);
 
-      res.status(200);
+      return res.status(200).json();
     });
   } catch (error) {
     console.log(error);
+    clearAuthTokenFromCookie(res);
     res.status(500).json({ message: "Failed to validate refresh token" });
   }
 };

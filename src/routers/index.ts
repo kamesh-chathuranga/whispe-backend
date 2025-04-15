@@ -1,9 +1,10 @@
 import { Router } from "express";
-import authRouter from "./authRouter";
+import AuthRoute from "./AuthRoute";
+import UserRoute from "./UserRoute";
 
 const appRouter = Router();
 
-appRouter.use("/auth", authRouter);
-// appRouter.use("/users");
+appRouter.use("/auth", AuthRoute);
+appRouter.use("/users", UserRoute);
 
 export default appRouter;

@@ -2,34 +2,38 @@ import { Response } from "express";
 
 export const setAuthTokenInCookie = (
   res: Response,
-  accessToken: string,
-  refreshToken: string
+  refreshToken: string,
+  accessToken: string
 ) => {
-  res.cookie("access_token", accessToken, {
-    // domain: process.env.FRONTEND_URL,
-    httpOnly: true,
-    path: "/",
-    maxAge: 15 * 60 * 1000, // 30 days
-    sameSite: "lax",
-  });
+  const isProduction = process.env.NODE_ENV === "production";
 
-  res.cookie("refresh_token", refreshToken, {
+  res.cookie("refreshToken", refreshToken, {
     // domain: process.env.FRONTEND_URL,
     httpOnly: true,
+    secure: isProduction,
     path: "/",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    sameSite: "lax",
+    sameSite: isProduction ? "strict" : "lax",
+  });
+
+  return res.cookie("accessToken", accessToken, {
+    // domain: process.env.FRONTEND_URL,
+    httpOnly: true,
+    secure: isProduction,
+    path: "/",
+    maxAge: 15 * 60 * 1000, // 15 Min
+    sameSite: isProduction ? "strict" : "lax",
   });
 };
 
 export const clearAuthTokenFromCookie = (res: Response) => {
-  res.clearCookie("access_token", {
+  res.clearCookie("refreshToken", {
     // domain: process.env.FRONTEND_URL,
     httpOnly: true,
     path: "/",
   });
 
-  res.clearCookie("refresh_token", {
+  return res.clearCookie("accessToken", {
     // domain: process.env.FRONTEND_URL,
     httpOnly: true,
     path: "/",

@@ -22,6 +22,6 @@ authRouter.post(
 
 authRouter.post("/logout", jwtParse, AuthController.logOutCurrentUser);
 
-authRouter.get("/refresh", AuthController.validateRefreshToken);
+authRouter.post("/refresh", AuthController.validateRefreshToken);
 
 export default authRouter;
