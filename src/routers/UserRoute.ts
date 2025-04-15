@@ -5,8 +5,8 @@ import { jwtParse } from "../middleware/validateToken";
 
 const router = express.Router();
 
-router.get("/", jwtParse, UserController.getAllUsers);
+router.get("/me", jwtParse, UserController.getUserById);
 
-router.get("/:userId", UserController.getUserById);
+router.get("/", jwtParse, UserController.getAllUsers);
 
 export default router;
