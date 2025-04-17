@@ -1,183 +1,229 @@
 import { Request, Response } from "express";
-import mongoose from "mongoose";
 import { IFriendRequest, FriendRequest } from "../model/FriendRequest";
-import { User } from "../model/UserModel";
-import { createOneToOneChat } from "./ChatController";
+import { IUser, User } from "../model/UserModel";
+import { isValidObjectId } from "mongoose";
+import { Chat } from "../model/ChatModel";
 
-/**
- * Send a friend request from current user to target user.
- */
 const sendFriendRequest = async (req: Request, res: Response) => {
   try {
-    const { receiverId, currentUserId } = req.body;
+    const senderId = req.userId;
+    const { receiverId } = req.body;
 
-    if (!currentUserId || !receiverId) {
+    if (!senderId || !receiverId) {
       return res
         .status(400)
         .json({ message: "Current user or receiverId not provided" });
     }
 
-    // Check if a friend request already exists in pending state
+    if (!isValidObjectId(receiverId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
     const existingRequest = await FriendRequest.findOne({
-      sender: currentUserId,
+      sender: senderId,
       receiver: receiverId,
-      status: "pending",
     });
+
     if (existingRequest) {
       return res.status(400).json({ message: "Friend request already sent." });
     }
 
-    // Create a new friend request document
+    const existingRequestReverse = await FriendRequest.findOne({
+      sender: receiverId,
+      receiver: senderId,
+    });
+
+    if (existingRequestReverse) {
+      return res.status(400).json({
+        message: "Friend request already sent from the other user.",
+      });
+    }
+
+    const isAlreadyFriend = await User.findOne({
+      _id: senderId,
+      friends: receiverId,
+    });
+
+    if (isAlreadyFriend) {
+      return res.status(400).json({ message: "Already friends." });
+    }
+
     const friendRequest: IFriendRequest = new FriendRequest({
-      sender: currentUserId,
+      sender: senderId,
       receiver: receiverId,
     });
     await friendRequest.save();
 
-    return res
-      .status(201)
-      .json({ message: "Friend request sent", friendRequest });
+    const io = req.app.get("io");
+    io.to(receiverId).emit(
+      "friendRequestReceived",
+      await friendRequest.populate("sender", "name avatarUrl")
+    );
+
+    return res.status(201).json({ message: "Friend request sent" });
   } catch (error) {
     console.error("Error sending friend request:", error);
-    return res
-      .status(500)
-      .json({ message: "Server error while sending friend request" });
+    return res.status(500).json({ message: "Failed to send friend request" });
   }
 };
 
-/**
- * Get friend requests sent by the current user.
- */
-// export const getSentFriendRequests = async (req: Request, res: Response) => {
-//   try {
-//     const currentUserId = req.user?._id;
-//     if (!currentUserId) {
-//       return res.status(401).json({ message: "Unauthorized" });
-//     }
+export const getSentFriendRequests = async (req: Request, res: Response) => {
+  try {
+    const senderId = req.userId;
+    if (!senderId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-//     const sentRequests = await FriendRequest.find({
-//       sender: currentUserId,
-//       status: "pending",
-//     }).populate("receiver", "name email avatarUrl");
+    const sentRequests = await FriendRequest.find({
+      sender: senderId,
+    }).populate("receiver", "name avatarUrl");
 
-//     return res.status(200).json(sentRequests);
-//   } catch (error) {
-//     console.error("Error retrieving sent friend requests:", error);
-//     return res
-//       .status(500)
-//       .json({ message: "Server error while retrieving sent friend requests" });
-//   }
-// };
+    return res.status(200).json(sentRequests);
+  } catch (error) {
+    console.error("Error retrieving sent friend requests:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to retriev sent friend requests" });
+  }
+};
 
-// /**
-//  * Get friend requests received by the current user.
-//  */
-// export const getReceivedFriendRequests = async (
-//   req: Request,
-//   res: Response
-// ) => {
-//   try {
-//     const currentUserId = req.user?._id;
-//     if (!currentUserId) {
-//       return res.status(401).json({ message: "Unauthorized" });
-//     }
+export const getReceivedFriendRequests = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const senderId = req.userId;
+    if (!senderId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-//     const receivedRequests = await FriendRequest.find({
-//       receiver: currentUserId,
-//       status: "pending",
-//     }).populate("sender", "name email avatarUrl");
+    const receivedRequests = await FriendRequest.find({
+      receiver: senderId,
+    }).populate("sender", "name avatarUrl");
 
-//     return res.status(200).json(receivedRequests);
-//   } catch (error) {
-//     console.error("Error retrieving received friend requests:", error);
-//     return res
-//       .status(500)
-//       .json({
-//         message: "Server error while retrieving received friend requests",
-//       });
-//   }
-// };
+    return res.status(200).json(receivedRequests);
+  } catch (error) {
+    console.error("Error retrieving received friend requests:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to retriev received friend requests" });
+  }
+};
 
-// /**
-//  * Cancel a sent friend request.
-//  */
-// export const cancelFriendRequest = async (req: Request, res: Response) => {
-//   try {
-//     const currentUserId = req.user?._id;
-//     const { requestId } = req.params;
+export const cancelFriendRequest = async (req: Request, res: Response) => {
+  try {
+    const senderId = req.userId;
+    const { requestId } = req.params;
 
-//     if (!currentUserId || !mongoose.Types.ObjectId.isValid(requestId)) {
-//       return res.status(400).json({ message: "Invalid request" });
-//     }
+    if (!senderId || !requestId) {
+      return res.status(400).json({ message: "Invalid request" });
+    }
 
-//     // Only allow cancellation if the current user is the sender.
-//     const friendRequest = await FriendRequest.findOneAndDelete({
-//       _id: requestId,
-//       sender: currentUserId,
-//       status: "pending",
-//     });
+    if (!isValidObjectId(requestId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
 
-//     if (!friendRequest) {
-//       return res
-//         .status(404)
-//         .json({ message: "Friend request not found or already processed." });
-//     }
+    const friendRequest = await FriendRequest.findOneAndDelete({
+      _id: requestId,
+      $or: [{ sender: senderId }, { receiver: senderId }],
+    });
 
-//     return res.status(200).json({ message: "Friend request canceled." });
-//   } catch (error) {
-//     console.error("Error canceling friend request:", error);
-//     return res
-//       .status(500)
-//       .json({ message: "Server error while canceling friend request" });
-//   }
-// };
+    if (!friendRequest) {
+      return res
+        .status(404)
+        .json({ message: "Friend request not found or already processed." });
+    }
 
-// /**
-//  * Accept a received friend request.
-//  * This function updates both users' friend lists, sets the friend request to 'accepted',
-//  * and creates a one-to-one chat room between the two users.
-//  */
-// export const acceptFriendRequest = async (req: Request, res: Response) => {
-//   try {
-//     const currentUserId = req.user?._id;
-//     const { requestId } = req.params;
+    return res.status(200).json({ message: "Friend request canceled." });
+  } catch (error) {
+    console.error("Error canceling friend request:", error);
+    return res.status(500).json({ message: "Failed to cancel friend request" });
+  }
+};
 
-//     if (!currentUserId || !mongoose.Types.ObjectId.isValid(requestId)) {
-//       return res.status(400).json({ message: "Invalid request" });
-//     }
+export const acceptFriendRequest = async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const currentUserId = req.userId;
 
-//     // Find the friend request; ensure the current user is the receiver.
-//     const friendRequest = await FriendRequest.findOne({
-//       _id: requestId,
-//       receiver: currentUserId,
-//       status: "pending",
-//     });
+  try {
+    if (!currentUserId || !requestId) {
+      return res.status(400).json({ message: "Invalid request" });
+    }
 
-//     if (!friendRequest) {
-//       return res
-//         .status(404)
-//         .json({ message: "Friend request not found or already processed." });
-//     }
+    if (!isValidObjectId(requestId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
 
-//     // Update the status to accepted.
-//     friendRequest.status = "accepted";
-//     await friendRequest.save();
+    const friendRequest = await FriendRequest.findById(requestId);
 
-//     // Update both users' friend lists
-//     const { sender, receiver } = friendRequest;
-//     await User.findByIdAndUpdate(sender, { $addToSet: { friends: receiver } });
-//     await User.findByIdAndUpdate(receiver, { $addToSet: { friends: sender } });
+    if (!friendRequest) {
+      return res
+        .status(404)
+        .json({ message: "Friend request not found or already handled" });
+    }
 
-//     // Create a one-to-one chat if it does not exist
-//     const chat = await createOneToOneChat(sender, receiver);
+    if (friendRequest.receiver.toString() !== currentUserId) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to accept this request" });
+    }
 
-//     return res.status(200).json({ message: "Friend request accepted", chat });
-//   } catch (error) {
-//     console.error("Error accepting friend request:", error);
-//     return res
-//       .status(500)
-//       .json({ message: "Server error while accepting friend request" });
-//   }
-// };
+    await User.findByIdAndUpdate(currentUserId, {
+      $addToSet: { friends: friendRequest.sender },
+    });
 
-export default { sendFriendRequest };
+    await User.findByIdAndUpdate(friendRequest.sender, {
+      $addToSet: { friends: friendRequest.receiver },
+    });
+
+    let chat = await Chat.findOne({
+      participants: { $all: [friendRequest.sender, friendRequest.receiver] },
+    });
+
+    if (!chat) {
+      chat = new Chat({
+        participants: [friendRequest.sender, friendRequest.receiver],
+      });
+      await chat.save();
+    }
+
+    const currentUser = await User.findById<IUser>(currentUserId)
+      .select("name avatarUrl")
+      .lean();
+
+    const friendRequestSender = await User.findById<IUser>(friendRequest.sender)
+      .select("name avatarUrl")
+      .lean();
+
+    const io = req.app.get("io");
+    io.to(friendRequest.sender.toString()).emit("friendRequestAccepted", {
+      partnerName: currentUser?.name,
+      avatarUrl: currentUser?.avatarUrl,
+      userId: currentUserId,
+      id: chat._id,
+    });
+
+    io.to(currentUserId).emit("friendRequestAccepted", {
+      partnerName: friendRequestSender?.name,
+      avatarUrl: friendRequestSender?.avatarUrl,
+      userId: currentUserId,
+      id: chat._id,
+    });
+
+    await friendRequest.deleteOne();
+    return res.status(200).json({ message: "Friend request accepted" });
+  } catch (error) {
+    console.error("Accept friend error:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to accept the friend request" });
+  }
+};
+
+export default {
+  sendFriendRequest,
+  getSentFriendRequests,
+  getReceivedFriendRequests,
+  cancelFriendRequest,
+  acceptFriendRequest,
+};
