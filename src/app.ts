@@ -6,8 +6,12 @@ import helmet from "helmet";
 import morgan from "morgan";
 
 import { createServer } from "http";
-import { Server } from "socket.io";
+import { Server, Socket } from "socket.io";
 import appRouter from "./routers";
+import { verifyAccessToken } from "./middleware/validateToken";
+import mongoose, { isValidObjectId } from "mongoose";
+import { Chat } from "./model/ChatModel";
+import { Message } from "./model/Message";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -26,15 +30,119 @@ const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
-io.on("connection", (socket) => {
-  console.log("A client connected:", socket.id);
+// Socket.IO auth middleware
+io.use((socket: Socket, next) => {
+  try {
+    const cookies = socket.request.headers.cookie;
+    if (!cookies) throw new Error("No cookies");
+    const parsed = Object.fromEntries(
+      cookies.split("; ").map((c) => c.split("="))
+    );
+    const accessToken = parsed["accessToken"];
+    if (!accessToken) throw new Error("No access token");
+    const payload = verifyAccessToken(accessToken);
+    socket.data.userId = payload.userId;
+    next();
+  } catch (err) {
+    next(new Error("Authentication error"));
+  }
+});
 
-  socket.on("join", (userId: string) => {
-    socket.join(userId);
-    console.log(`User ${userId} joined with socket ${socket.id}`);
+io.on("connection", (socket) => {
+  const userId = socket.data.userId;
+  console.log(`User connected: ${userId}`);
+
+  // Join personal room for notifications
+  socket.join(userId);
+
+  // Handle joining a chat
+  socket.on("joinChat", async (chatId: string, ack: Function) => {
+    if (!isValidObjectId(chatId))
+      return ack({ status: 400, error: "Invalid chatId" });
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) return ack({ status: 404, error: "Chat not found" });
+
+    if (
+      !chat.participants.includes(
+        mongoose.Types.ObjectId.createFromHexString(userId)
+      )
+    )
+      return ack({ status: 403, error: "Not a participant" });
+
+    socket.join(chatId);
+    ack({ status: 200, data: "Joined chat" });
+  });
+
+  // Handle sending message
+  socket.on("message:send", async (data: any, ack: Function) => {
+    try {
+      const { chatId, content, attachments } = data;
+      // Validate chat
+      if (!isValidObjectId(chatId))
+        return ack({ status: 400, error: "Invalid chatId" });
+
+      const chat = await Chat.findById(chatId);
+      if (!chat) return ack({ status: 404, error: "Chat not found" });
+
+      if (
+        !chat.participants.includes(
+          mongoose.Types.ObjectId.createFromHexString(userId)
+        )
+      )
+        return ack({ status: 403, error: "Not a participant" });
+
+      // Create message
+      const message = await Message.create({
+        sender: userId,
+        chat: chatId,
+        content,
+        attachments,
+      });
+
+      const populatedMessage = await message.populate({
+        path: "sender",
+        select: "name avatarUrl", // Include other fields if needed
+      });
+
+      // Update last message
+      chat.lastMessage = message._id;
+      await chat.save();
+
+      // Broadcast to room
+      io.to(chatId).emit("message:new", populatedMessage);
+
+      ack({ status: 201, data: message });
+    } catch (err: any) {
+      console.error("message:send error", err);
+      ack({ status: 500, error: "Internal server error" });
+    }
+  });
+
+  // Fetch message history
+  socket.on("message:history", async (data: any, ack: Function) => {
+    try {
+      const { chatId, before, limit } = data;
+      if (!isValidObjectId(chatId))
+        return ack({ status: 400, error: "Invalid chatId" });
+
+      const query: any = { chat: chatId };
+      if (before) query.createdAt = { $lt: new Date(before) };
+
+      const recentMessages = await Message.find(query)
+        .populate({ path: "sender", select: "name avatarUrl" })
+        .sort({ createdAt: -1 })
+        .limit(limit || 20);
+      // Return in ascending order
+      ack({ status: 200, data: recentMessages.reverse() });
+    } catch (err: any) {
+      console.error(err);
+      ack({ status: 500, error: "Server error" });
+    }
   });
 
   socket.on("disconnect", () => {

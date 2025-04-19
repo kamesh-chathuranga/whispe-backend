@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { User } from "../model/UserModel";
-import { isValidObjectId } from "mongoose";
 
 const getUserById = async (req: Request, res: Response) => {
   try {

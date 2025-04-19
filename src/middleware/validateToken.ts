@@ -22,8 +22,7 @@ export const jwtParse = async (
   }
 
   try {
-    const SECRET = process.env.JWT_ACCESS_TOKEN_SECRET as string;
-    const decode = jwt.verify(cookies.accessToken, SECRET) as jwt.JwtPayload;
+    const decode = verifyAccessToken(cookies.accessToken);
     const userId = decode.userId;
     const user = await User.findById(userId);
 
@@ -37,3 +36,8 @@ export const jwtParse = async (
     res.status(401).json({ message: "ACCESS_TOKEN_NOT_VALID" });
   }
 };
+
+export function verifyAccessToken(token: string) {
+  const SECRET = process.env.JWT_ACCESS_TOKEN_SECRET as string;
+  return jwt.verify(token, SECRET) as jwt.JwtPayload;
+}
