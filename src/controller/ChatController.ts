@@ -13,7 +13,7 @@ export const getUserChats = async (req: Request, res: Response) => {
         select: "_id name avatarUrl",
       });
 
-    // Optionally: Add latest message to each chat
+    // Add latest message to each chat
     const chatDataWithLastMessages = await Promise.all(
       chats.map(async (chat) => {
         const lastMessage = await Message.findOne({ chat: chat._id })
@@ -21,7 +21,11 @@ export const getUserChats = async (req: Request, res: Response) => {
           .limit(1);
 
         return {
-          ...chat.toObject(),
+          _id: chat._id,
+          partner:
+            chat.participants[0]._id.toString() === userId
+              ? chat.participants[1]
+              : chat.participants[0],
           lastMessage,
         };
       })

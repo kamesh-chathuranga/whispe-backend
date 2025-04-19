@@ -56,7 +56,7 @@ const sendFriendRequest = async (req: Request, res: Response) => {
 
     const io = req.app.get("io");
     io.to(receiverId).emit(
-      "friendRequestReceived",
+      "friendRequest:received",
       await friendRequest.populate("sender", "name avatarUrl")
     );
 
@@ -196,18 +196,24 @@ export const acceptFriendRequest = async (req: Request, res: Response) => {
       .lean();
 
     const io = req.app.get("io");
-    io.to(friendRequest.sender.toString()).emit("friendRequestAccepted", {
-      partnerName: currentUser?.name,
-      avatarUrl: currentUser?.avatarUrl,
-      userId: currentUserId,
-      id: chat._id,
+    io.to(friendRequest.sender.toString()).emit("friendRequest:accepted", {
+      _id: chat._id,
+      partner: {
+        _id: currentUserId,
+        name: currentUser?.name,
+        avatarUrl: currentUser?.avatarUrl,
+      },
+      acceptBy: currentUserId,
     });
 
-    io.to(currentUserId).emit("friendRequestAccepted", {
-      partnerName: friendRequestSender?.name,
-      avatarUrl: friendRequestSender?.avatarUrl,
-      userId: currentUserId,
-      id: chat._id,
+    io.to(currentUserId).emit("friendRequest:accepted", {
+      _id: chat._id,
+      partner: {
+        _id: friendRequest.sender,
+        name: friendRequestSender?.name,
+        avatarUrl: friendRequestSender?.avatarUrl,
+      },
+      acceptBy: currentUserId,
     });
 
     await friendRequest.deleteOne();
