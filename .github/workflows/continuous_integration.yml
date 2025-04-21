@@ -1,0 +1,57 @@
+name: Chatter Continuous Integration
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    # Use a self-hosted runner or change to ubuntu-latest if preferred
+    runs-on: self-hosted
+
+    # Define environment variables from GitHub Secrets
+    # These must be configured in Settings → Secrets and variables → Actions
+    env:
+      PORT: ${{ secrets.PORT }}
+      MONGODB_CONNECTING_URL: ${{ secrets.MONGODB_CONNECTING_URL }}
+      JWT_ACCESS_TOKEN_SECRET: ${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
+      ACCESS_TOKEN_EXPIRATION: ${{ secrets.ACCESS_TOKEN_EXPIRATION }}
+      JWT_REFRESH_TOKEN_SECRET: ${{ secrets.JWT_REFRESH_TOKEN_SECRET }}
+      REFRESH_TOKEN_EXPIRATION: ${{ secrets.REFRESH_TOKEN_EXPIRATION }}
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies with clean install
+        run: npm ci
+
+      - name: Generate .env file
+        run: |
+          cat <<EOF > .env
+          PORT=${{ env.PORT }}
+          MONGODB_CONNECTING_URL=${{ env.MONGODB_CONNECTING_URL }}
+          JWT_ACCESS_TOKEN_SECRET=${{ env.JWT_ACCESS_TOKEN_SECRET }}
+          ACCESS_TOKEN_EXPIRATION=${{ env.ACCESS_TOKEN_EXPIRATION }}
+          JWT_REFRESH_TOKEN_SECRET=${{ env.JWT_REFRESH_TOKEN_SECRET }}
+          REFRESH_TOKEN_EXPIRATION=${{ env.REFRESH_TOKEN_EXPIRATION }}
+          ENCRYPTION_KEY=${{ env.ENCRYPTION_KEY }}
+          FRONTEND_URL=${{ env.FRONTEND_URL }}
+          EOF
+
+      - name: Run build
+        run: npm run build
+        
