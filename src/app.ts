@@ -145,6 +145,53 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Handle vedio calling
+  socket.on("call", async (data: any, ack: Function) => {
+    try {
+      const { caller, receiver } = data;
+      // Validate chat
+      if (!isValidObjectId(caller._id))
+        return ack({ status: 400, error: "Invalid callerId" });
+
+      // Broadcast to room
+      io.to(receiver._id).emit("call:incoming", data);
+
+      ack({ status: 200, data: data });
+    } catch (err: any) {
+      console.error("call error", err);
+      ack({ status: 500, error: "Internal server error" });
+    }
+  });
+
+  socket.on("webrtcSignal", (data) => {
+    const { incomingCall, isCaller } = data;
+
+    if (isCaller) {
+      if (incomingCall.receiver._id) {
+        io.to(incomingCall.receiver._id).emit("webrtcSignal", data);
+      }
+    } else {
+      if (incomingCall.caller._id) {
+        io.to(incomingCall.caller._id).emit("webrtcSignal", data);
+      }
+    }
+  });
+
+  socket.on("call:hangup", (data) => {
+    const { incomingCall, hangupUserId } = data;
+    let userId;
+
+    if (incomingCall.caller._id === hangupUserId) {
+      userId = incomingCall.receiver._id;
+    } else {
+      userId = incomingCall.caller._id;
+    }
+
+    if (userId) {
+      io.to(userId).emit("call:hangup");
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
   });
