@@ -24,6 +24,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
 app.use(morgan("dev"));
 
+app.use("/health", (req, res) => {
+  res.status(200).json({ message: "Server is running" });
+});
+
 app.use("/api/v1", appRouter);
 
 const io = new Server(httpServer, {
