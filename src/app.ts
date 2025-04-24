@@ -58,7 +58,7 @@ io.use((socket: Socket, next) => {
 
 io.on("connection", (socket) => {
   const userId = socket.data.userId;
-  console.log(`User connected: ${userId}`);
+  console.log(`⚡️ Socket connected: ${userId}`);
 
   // Join personal room for notifications
   socket.join(userId);
@@ -196,8 +196,18 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Handle typing start
+  socket.on("typing", (chatId) => {
+    socket.to(chatId).emit("typing");
+  });
+
+  // Handle typing stop
+  socket.on("typing:stop", (chatId) => {
+    socket.to(chatId).emit("typing:stop");
+  });
+
   socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+    console.log(`🔌 Socket disconnected: ${socket.id}`);
   });
 });
 
