@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import { IFriendRequest, FriendRequest } from "../model/FriendRequest";
-import { IUser, User } from "../model/UserModel";
+import { IUser, User } from "../model/User";
 import { isValidObjectId } from "mongoose";
-import { Chat } from "../model/ChatModel";
+import { Chat } from "../model/Chat";
 
 const sendFriendRequest = async (req: Request, res: Response) => {
   try {

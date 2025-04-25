@@ -6,7 +6,6 @@ export interface IUser extends Document {
   email: string;
   password: string;
   avatarUrl?: string;
-  isOnline: boolean;
   lastSeen: Date;
   refreshToken: string | null;
   friends: mongoose.Types.ObjectId[];
@@ -29,10 +28,6 @@ const userSchema = new Schema<IUser>(
     },
     avatarUrl: {
       type: String,
-    },
-    isOnline: {
-      type: Boolean,
-      default: false,
     },
     lastSeen: {
       type: Date,

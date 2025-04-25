@@ -7,11 +7,12 @@ import morgan from "morgan";
 
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
-import appRouter from "./routers";
 import { verifyAccessToken } from "./middleware/validateToken";
-import mongoose, { isValidObjectId } from "mongoose";
-import { Chat } from "./model/ChatModel";
+import mongoose, { isValidObjectId, ObjectId } from "mongoose";
+import appRouter from "./routers";
+import { Chat } from "./model/Chat";
 import { Message } from "./model/Message";
+import { User } from "./model/User";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -38,16 +39,22 @@ const io = new Server(httpServer, {
   },
 });
 
+// track online users
+const onlineUsers = new Set<string>();
+
 // Socket.IO auth middleware
 io.use((socket: Socket, next) => {
   try {
     const cookies = socket.request.headers.cookie;
     if (!cookies) throw new Error("No cookies");
+
     const parsed = Object.fromEntries(
       cookies.split("; ").map((c) => c.split("="))
     );
     const accessToken = parsed["accessToken"];
+
     if (!accessToken) throw new Error("No access token");
+
     const payload = verifyAccessToken(accessToken);
     socket.data.userId = payload.userId;
     next();
@@ -56,9 +63,48 @@ io.use((socket: Socket, next) => {
   }
 });
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   const userId = socket.data.userId;
+
+  if (!userId) return socket.disconnect();
+
+  onlineUsers.add(userId);
   console.log(`⚡️ Socket connected: ${userId}`);
+
+  const user = await User.findById(userId).select("friends");
+  const friendList = user?.friends;
+
+  if (friendList.length > 0) {
+    // Send online status of friends to the connected user
+    const friendStatuses = await Promise.all(
+      friendList.map(async (friendId: ObjectId) => {
+        const isOnline = onlineUsers.has(friendId.toString());
+
+        if (isOnline) {
+          return { userId: friendId, isOnline: true };
+        } else {
+          // Get last seen for offline friends
+          const friend = await User.findById(friendId).select("lastSeen");
+          return {
+            userId: friendId,
+            isOnline: false,
+            lastSeen: friend?.lastSeen,
+          };
+        }
+      })
+    );
+
+    // Send friend statuses to the user
+    socket.emit("friends:status", friendStatuses);
+
+    // Notify friends that this user is online
+    friendList.forEach((friendId: ObjectId) => {
+      socket.to(friendId.toString()).emit("friend:status", {
+        userId,
+        isOnline: true,
+      });
+    });
+  }
 
   // Join personal room for notifications
   socket.join(userId);
@@ -206,8 +252,28 @@ io.on("connection", (socket) => {
     socket.to(chatId).emit("typing:stop");
   });
 
-  socket.on("disconnect", () => {
-    console.log(`🔌 Socket disconnected: ${socket.id}`);
+  socket.on("disconnect", async () => {
+    if (!userId) return;
+
+    // Remove from online users
+    onlineUsers.delete(userId);
+    console.log(`🔌 Socket disconnected: ${userId}`);
+
+    // Update last seen timestamp in database
+    const lastSeen = new Date();
+    await User.findByIdAndUpdate(userId, { lastSeen });
+
+    // Notify friends that user went offline
+    const user = await User.findById(userId).select("friends");
+    if (user && user.friends) {
+      user.friends.forEach((friendId: ObjectId) => {
+        socket.to(friendId.toString()).emit("friend:status", {
+          userId,
+          isOnline: false,
+          lastSeen,
+        });
+      });
+    }
   });
 });
 
