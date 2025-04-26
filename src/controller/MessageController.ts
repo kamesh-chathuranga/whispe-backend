@@ -1,48 +1,45 @@
 import { Request, Response } from "express";
+import { isValidObjectId } from "mongoose";
+import { Message } from "../model/Message";
+import { Chat } from "../model/Chat"; // Make sure to import the Chat model
 
-const getAllUserMessages = async (req: Request, res: Response) => {
+const getAllChatMessages = async (req: Request, res: Response) => {
   try {
-    const { from, to } = req.params;
-    // const messages = await prisma.message.findMany({
-    //   where: {
-    //     OR: [
-    //       {
-    //         authorId: from,
-    //         receiverId: to,
-    //       },
-    //       {
-    //         authorId: to,
-    //         receiverId: from,
-    //       },
-    //     ],
-    //   },
-    //   orderBy: {
-    //     id: "asc",
-    //   },
-    // });
+    const { chatId, before, limit } = req.body;
+    const userId = req.userId;
 
-    // const unreadMessages = messages
-    //   .filter((message) => message.status !== "read" && message.authorId === to)
-    //   .map((message) => message.id);
+    if (!isValidObjectId(chatId)) {
+      return res.status(400).json({ message: "Invalid chatId" });
+    }
 
-    // await prisma.message.updateMany({
-    //   where: {
-    //     id: {
-    //       in: unreadMessages,
-    //     },
-    //   },
-    //   data: {
-    //     status: "read",
-    //   },
-    // });
+    // First, verify the user is a participant in this chat
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: userId,
+    });
 
-    // return res.status(200).json(messages);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Failed to get messages" });
+    if (!chat) {
+      return res.status(403).json({
+        message: "Access denied. You are not a participant in this chat.",
+      });
+    }
+
+    // If verification passes, proceed with fetching messages
+    const query: any = { chat: chatId };
+    if (before) query.createdAt = { $lt: new Date(before) };
+
+    const recentMessages = await Message.find(query)
+      .populate({ path: "sender", select: "name avatarUrl" })
+      .sort({ createdAt: -1 })
+      .limit(limit || 20);
+
+    return res.status(200).json(recentMessages.reverse());
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to fetch messages" });
   }
 };
 
 export default {
-  getAllUserMessages,
+  getAllChatMessages,
 };

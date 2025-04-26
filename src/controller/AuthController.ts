@@ -6,7 +6,10 @@ import {
   decryptRefreshToken,
   encryptRefreshToken,
 } from "../util/encryptionService";
-import { clearAuthTokenFromCookie, setAuthTokenInCookie } from "../util/cookie";
+import {
+  clearAuthTokenFromCookie,
+  setAuthTokenInCookie,
+} from "../util/cookieService";
 
 const registerCurrentUser = async (req: Request, res: Response) => {
   try {
