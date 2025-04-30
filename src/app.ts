@@ -110,7 +110,7 @@ io.on("connection", async (socket) => {
   socket.join(userId);
 
   // Handle joining a chat
-  socket.on("joinChat", async (chatId: string, ack: Function) => {
+  socket.on("join:chat", async (chatId: string, ack: Function) => {
     if (!isValidObjectId(chatId))
       return ack({ status: 400, error: "Invalid chatId" });
 
@@ -204,6 +204,7 @@ io.on("connection", async (socket) => {
         return ack({ status: 400, error: "Invalid callerId" });
 
       // Broadcast to room
+      io.to(caller._id).emit("call:incoming", data);
       io.to(receiver._id).emit("call:incoming", data);
 
       ack({ status: 200, data: data });
