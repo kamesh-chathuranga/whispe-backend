@@ -7,31 +7,43 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME}} -p ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        run: docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" -p "${{ secrets.DOCKERHUB_TOKEN }}"
 
-      - name: Build Docker image
+      - name: Build & push Docker image
+        id: build-image
         run: |
-          IMAGE_NAME=${{ secrets.DOCKERHUB_USERNAME }}/chatter-backend-app:${{ github.sha }}
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/chatter-backend-app:${{ github.sha }}"
           docker build -t "$IMAGE_NAME" .
-          echo "IMAGE=$IMAGE_NAME" >> $GITHUB_ENV
-
-      - name: Push Docker image
-        run: docker push "$IMAGE"
+          docker push "$IMAGE_NAME"
+          echo "::set-output name=image::$IMAGE_NAME"
 
   deploy:
     needs: build
     runs-on: self-hosted
     steps:
-      - name: Pull the image from docker hub
-        run: docker pull "$IMAGE"
+      - name: Pull the image
+        run: docker pull "${{ needs.build.outputs.image }}"
 
-      - name: Delete old container
-        run: docker rm -f chatter-app-container
+      - name: Remove old container (if any)
+        run: docker rm -f chatter-app-container || true
 
-      - name: Run the Docker Container
-        run: docker run -d -p 7000:7000 --name chatter-app-container -e PORT='${{ secrets.PORT }}' MONGODB_CONNECTING_URL='${{ secrets.MONGODB_CONNECTING_URL }}' JWT_ACCESS_TOKEN_SECRET='${{ secrets.JWT_ACCESS_TOKEN_SECRET }}' ACCESS_TOKEN_EXPIRATION='${{ secrets.ACCESS_TOKEN_EXPIRATION }}' JWT_REFRESH_TOKEN_SECRET='${{ secrets.JWT_REFRESH_TOKEN_SECRET }}' REFRESH_TOKEN_EXPIRATION='${{ secrets.REFRESH_TOKEN_EXPIRATION }}' ENCRYPTION_KEY='${{ secrets.ENCRYPTION_KEY }}' FRONTEND_URL='${{ secrets.FRONTEND_URL }}' "$IMAGE"
+      - name: Run the container
+        run: |
+          docker run -d -p 7000:7000 \
+            --name chatter-app-container \
+            -e PORT="${{ secrets.PORT }}" \
+            -e MONGODB_CONNECTING_URL="${{ secrets.MONGODB_CONNECTING_URL }}" \
+            -e JWT_ACCESS_TOKEN_SECRET="${{ secrets.JWT_ACCESS_TOKEN_SECRET }}" \
+            -e ACCESS_TOKEN_EXPIRATION="${{ secrets.ACCESS_TOKEN_EXPIRATION }}" \
+            -e JWT_REFRESH_TOKEN_SECRET="${{ secrets.JWT_REFRESH_TOKEN_SECRET }}" \
+            -e REFRESH_TOKEN_EXPIRATION="${{ secrets.REFRESH_TOKEN_EXPIRATION }}" \
+            -e ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
+            -e FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
+            "${{ needs.build.outputs.image }}"
