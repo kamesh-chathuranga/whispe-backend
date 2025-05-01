@@ -7,8 +7,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.build-image.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,21 +21,41 @@ jobs:
         id: build-image
         run: |
           IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/chatter-backend-app:${{ github.sha }}"
-          echo "Building image: $IMAGE_NAME"  # Debug line
+          echo "Building image: $IMAGE_NAME"
           docker build -t "$IMAGE_NAME" .
           docker push "$IMAGE_NAME"
-          echo "image=$IMAGE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Write image name to file
+        run: |
+          echo "${{ secrets.DOCKERHUB_USERNAME }}/chatter-backend-app:${{ github.sha }}" > image.txt
+
+      - name: Upload image-name artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: image-name
+          path: image.txt
 
   deploy:
     needs: build
     runs-on: self-hosted
     steps:
-      - name: Debug image name
+      - name: Download image-name artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: image-name
+
+      - name: Read image name into env
+        id: read-image
         run: |
-          echo "Image to pull: ${{ needs.build.outputs.image }}"
+          IMAGE="$(cat image.txt)"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: "DEBUG: show image to pull"
+        run: |
+          echo "Pulling image: $IMAGE"
 
       - name: Pull the image
-        run: docker pull "${{ needs.build.outputs.image }}"
+        run: docker pull "$IMAGE"
 
       - name: Remove old container (if any)
         run: docker rm -f chatter-app-container || true
@@ -54,5 +72,4 @@ jobs:
             -e REFRESH_TOKEN_EXPIRATION="${{ secrets.REFRESH_TOKEN_EXPIRATION }}" \
             -e ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
             -e FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
-            "${{ needs.build.outputs.image }}"
-            
+            "$IMAGE"
