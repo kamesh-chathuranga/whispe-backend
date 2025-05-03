@@ -6,9 +6,10 @@ export const setAuthTokenInCookie = (
   accessToken: string
 ) => {
   const isProduction = process.env.NODE_ENV === "production";
+  const domain = isProduction ? ".chatters.social" : undefined;
 
   res.cookie("refreshToken", refreshToken, {
-    // domain: process.env.FRONTEND_URL,
+    domain,
     httpOnly: true,
     secure: isProduction,
     path: "/",
@@ -17,7 +18,7 @@ export const setAuthTokenInCookie = (
   });
 
   return res.cookie("accessToken", accessToken, {
-    // domain: process.env.FRONTEND_URL,
+    domain,
     httpOnly: true,
     secure: isProduction,
     path: "/",
