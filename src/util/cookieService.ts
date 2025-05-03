@@ -13,7 +13,7 @@ export const setAuthTokenInCookie = (
     secure: isProduction,
     path: "/",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? "none" : "lax",
   });
 
   return res.cookie("accessToken", accessToken, {
@@ -22,7 +22,7 @@ export const setAuthTokenInCookie = (
     secure: isProduction,
     path: "/",
     maxAge: 15 * 60 * 1000, // 15 Min
-    sameSite: isProduction ? "strict" : "lax",
+    sameSite: isProduction ? "none" : "lax",
   });
 };
 
