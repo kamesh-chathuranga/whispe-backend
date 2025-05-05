@@ -17,6 +17,7 @@ export interface IMessage extends Document {
   content: string;
   attachments?: IAttachment[];
   seenBy: Types.ObjectId;
+  status: "sent" | "delivered" | "read";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +45,11 @@ const MessageSchema = new Schema<IMessage>(
     content: { type: String, required: true },
     attachments: { type: [AttachmentSchema], default: [] },
     seenBy: { type: Schema.Types.ObjectId, ref: "User" },
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "read"],
+      default: "sent",
+    },
   },
   { timestamps: true }
 );

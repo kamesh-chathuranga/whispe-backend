@@ -71,6 +71,41 @@ io.on("connection", async (socket) => {
   onlineUsers.add(userId);
   console.log(`⚡️ Socket connected: ${userId}`);
 
+  // Update message status for pending messages when user comes online
+  try {
+    // Find chats where this user is a participant
+    const userChats = await Chat.find({
+      participants: mongoose.Types.ObjectId.createFromHexString(userId),
+    }).select("_id");
+
+    const chatIds = userChats.map((chat) => chat._id);
+
+    // Find all messages sent to these chats that are still in "sent" status
+    // and not sent by this user
+    const pendingMessages = await Message.find({
+      chat: { $in: chatIds },
+      sender: { $ne: userId },
+      status: "sent",
+    });
+
+    // Update all messages to "delivered"
+    for (const message of pendingMessages) {
+      await Message.findByIdAndUpdate(message._id, { status: "delivered" });
+      io.emit("message:status", {
+        messageId: message._id,
+        status: "delivered",
+      });
+    }
+
+    if (pendingMessages.length > 0) {
+      console.log(
+        `Updated ${pendingMessages.length} messages to "delivered" for user ${userId}`
+      );
+    }
+  } catch (err) {
+    console.error("Error updating message status on user connection:", err);
+  }
+
   const user = await User.findById(userId).select("friends");
   const friendList = user?.friends;
 
@@ -166,6 +201,24 @@ io.on("connection", async (socket) => {
       // Broadcast to room
       io.to(chatId).emit("message:new", populatedMessage);
 
+      // Check if recipients are online and mark delivered immediately
+      const recipients = chat.participants.filter(
+        (participant: ObjectId) => participant.toString() !== userId
+      );
+
+      for (const recipient of recipients) {
+        const recipientId = recipient.toString();
+        if (onlineUsers.has(recipientId)) {
+          // Update status to delivered if recipient is online
+          await Message.findByIdAndUpdate(message._id, { status: "delivered" });
+          io.emit("message:status", {
+            messageId: message._id,
+            status: "delivered",
+          });
+          break; // Only need to update once for any online recipient
+        }
+      }
+
       ack({ status: 201, data: message });
     } catch (err: any) {
       console.error("message:send error", err);
@@ -173,29 +226,19 @@ io.on("connection", async (socket) => {
     }
   });
 
-  // Fetch message history
-  socket.on("message:history", async (data: any, ack: Function) => {
-    try {
-      const { chatId, before, limit } = data;
-      if (!isValidObjectId(chatId))
-        return ack({ status: 400, error: "Invalid chatId" });
-
-      const query: any = { chat: chatId };
-      if (before) query.createdAt = { $lt: new Date(before) };
-
-      const recentMessages = await Message.find(query)
-        .populate({ path: "sender", select: "name avatarUrl" })
-        .sort({ createdAt: -1 })
-        .limit(limit || 20);
-      // Return in ascending order
-      ack({ status: 200, data: recentMessages.reverse() });
-    } catch (err: any) {
-      console.error(err);
-      ack({ status: 500, error: "Server error" });
-    }
+  // mark delivered
+  socket.on("message:delivered", async ({ messageId }) => {
+    await Message.findByIdAndUpdate(messageId, { status: "delivered" });
+    io.emit("message:status", { messageId, status: "delivered" });
   });
 
-  // Handle vedio calling
+  // mark read
+  socket.on("message:read", async ({ messageId }) => {
+    await Message.findByIdAndUpdate(messageId, { status: "read" });
+    io.emit("message:status", { messageId, status: "read" });
+  });
+
+  // Handle calling
   socket.on("call", async (data: any, ack: Function) => {
     try {
       const { caller, receiver } = data;

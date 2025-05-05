@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
 import { Message } from "../model/Message";
-import { Chat } from "../model/Chat"; // Make sure to import the Chat model
+import { Chat } from "../model/Chat";
 
-const getAllChatMessages = async (req: Request, res: Response) => {
+const getChatMessages = async (req: Request, res: Response) => {
   try {
     const { chatId, before, limit } = req.body;
     const userId = req.userId;
@@ -12,7 +12,6 @@ const getAllChatMessages = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid chatId" });
     }
 
-    // First, verify the user is a participant in this chat
     const chat = await Chat.findOne({
       _id: chatId,
       participants: userId,
@@ -24,7 +23,6 @@ const getAllChatMessages = async (req: Request, res: Response) => {
       });
     }
 
-    // If verification passes, proceed with fetching messages
     const query: any = { chat: chatId };
     if (before) query.createdAt = { $lt: new Date(before) };
 
@@ -41,5 +39,5 @@ const getAllChatMessages = async (req: Request, res: Response) => {
 };
 
 export default {
-  getAllChatMessages,
+  getAllChatMessages: getChatMessages,
 };
