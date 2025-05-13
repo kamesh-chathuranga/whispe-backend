@@ -62,7 +62,7 @@ const sendFriendRequest = async (req: Request, res: Response) => {
 
     return res.status(201).json({ message: "Friend request sent" });
   } catch (error) {
-    console.error("Error sending friend request:", error);
+    console.log("Error sending friend request: ", error);
     return res.status(500).json({ message: "Failed to send friend request" });
   }
 };
@@ -80,7 +80,7 @@ export const getSentFriendRequests = async (req: Request, res: Response) => {
 
     return res.status(200).json(sentRequests);
   } catch (error) {
-    console.error("Error retrieving sent friend requests:", error);
+    console.log("Error retrieving sent friend requests: ", error);
     return res
       .status(500)
       .json({ message: "Failed to retriev sent friend requests" });
@@ -103,7 +103,7 @@ export const getReceivedFriendRequests = async (
 
     return res.status(200).json(receivedRequests);
   } catch (error) {
-    console.error("Error retrieving received friend requests:", error);
+    console.log("Error retrieving received friend requests: ", error);
     return res
       .status(500)
       .json({ message: "Failed to retriev received friend requests" });
@@ -136,16 +136,15 @@ export const cancelFriendRequest = async (req: Request, res: Response) => {
 
     return res.status(200).json({ message: "Friend request canceled." });
   } catch (error) {
-    console.error("Error canceling friend request:", error);
+    console.log("Error canceling friend request: ", error);
     return res.status(500).json({ message: "Failed to cancel friend request" });
   }
 };
 
 export const acceptFriendRequest = async (req: Request, res: Response) => {
-  const { requestId } = req.params;
-  const currentUserId = req.userId;
-
   try {
+    const { requestId } = req.params;
+    const currentUserId = req.userId;
     if (!currentUserId || !requestId) {
       return res.status(400).json({ message: "Invalid request" });
     }
@@ -219,7 +218,7 @@ export const acceptFriendRequest = async (req: Request, res: Response) => {
     await friendRequest.deleteOne();
     return res.status(200).json({ message: "Friend request accepted" });
   } catch (error) {
-    console.error("Accept friend error:", error);
+    console.log("Accept friend error: ", error);
     return res
       .status(500)
       .json({ message: "Failed to accept the friend request" });

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
 import { Message } from "../model/Message";
 import { Chat } from "../model/Chat";
+import { generateUploadURL } from "../util/s3Service";
 
 const getChatMessages = async (req: Request, res: Response) => {
   try {
@@ -33,11 +34,32 @@ const getChatMessages = async (req: Request, res: Response) => {
 
     return res.status(200).json(recentMessages.reverse());
   } catch (err: any) {
-    console.error(err);
+    console.log("Error get messages: " + err);
     return res.status(500).json({ message: "Failed to fetch messages" });
   }
 };
 
+const uploadMediaFiles = async (req: Request, res: Response) => {
+  try {
+    const files: { filename: string; contentType: string }[] = req.body;
+
+    const results = await Promise.all(
+      files.map(async ({ filename, contentType }) => {
+        const timestamp = Date.now();
+        const key = `uploads/${req.userId}/${timestamp}-${filename}`;
+        const url = await generateUploadURL(key, contentType);
+        return { filename, url, key };
+      })
+    );
+
+    res.json(results);
+  } catch (err) {
+    console.log("Error upload files" + err);
+    res.status(500).json({ message: "Could not generate presigned URLs" });
+  }
+};
+
 export default {
-  getAllChatMessages: getChatMessages,
+  getChatMessages,
+  uploadMediaFiles,
 };

@@ -25,7 +25,7 @@ const registerCurrentUser = async (req: Request, res: Response) => {
 
     res.status(201).json({ message: "User created successfully" });
   } catch (error) {
-    console.log(error);
+    console.log("Error register user: " + error);
     res.status(500).json({ message: "Failed to create new user" });
   }
 };
@@ -69,7 +69,7 @@ const logInCurrentUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ ...foundUser.toJSON() });
   } catch (error) {
-    console.log(error);
+    console.log("Error login user: " + error);
     res.status(500).json({ message: "Failed to login user" });
   }
 };
@@ -96,7 +96,7 @@ const logOutCurrentUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "Logout successful" });
   } catch (error) {
-    console.log(error);
+    console.log("Error logout user" + error);
     res.status(500).json({ message: "Failed to logout user" });
   }
 };
@@ -136,7 +136,7 @@ const validateRefreshToken = async (req: Request, res: Response) => {
       return res.status(200).json();
     });
   } catch (error) {
-    console.log(error);
+    console.log("Error validate refresh token: " + error);
     clearAuthTokenFromCookie(res);
     res.status(500).json({ message: "Failed to validate refresh token" });
   }

@@ -5,6 +5,7 @@ import MessageController from "../controller/MessageController";
 
 const router = express.Router();
 
-router.post("/", jwtParse, MessageController.getAllChatMessages);
+router.post("/", jwtParse, MessageController.getChatMessages);
+router.post("/upload", jwtParse, MessageController.uploadMediaFiles);
 
 export default router;

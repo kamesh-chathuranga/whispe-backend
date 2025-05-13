@@ -96,12 +96,6 @@ io.on("connection", async (socket) => {
         status: "delivered",
       });
     }
-
-    if (pendingMessages.length > 0) {
-      console.log(
-        `Updated ${pendingMessages.length} messages to "delivered" for user ${userId}`
-      );
-    }
   } catch (err) {
     console.error("Error updating message status on user connection:", err);
   }
