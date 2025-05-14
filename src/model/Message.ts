@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 export type AttachmentType = "image" | "audio" | "video" | "file";
 
 export interface IAttachment {
-  url: string;
+  objectKey: string;
   type: AttachmentType;
   filename: string;
   size: number;
@@ -14,37 +14,75 @@ export interface IAttachment {
 export interface IMessage extends Document {
   sender: Types.ObjectId;
   chat: Types.ObjectId;
-  content: string;
+  content?: string;
   attachments?: IAttachment[];
   seenBy: Types.ObjectId;
   status: "sent" | "delivered" | "read";
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 const AttachmentSchema = new Schema<IAttachment>(
   {
-    url: { type: String, required: true },
+    objectKey: {
+      type: String,
+      required: true,
+    },
     type: {
       type: String,
       required: true,
       enum: ["image", "audio", "video", "file"],
     },
-    filename: { type: String, required: true },
-    size: { type: Number, required: true },
-    mimeType: { type: String, required: true },
-    duration: { type: Number },
+    filename: {
+      type: String,
+      required: true,
+    },
+    size: {
+      type: Number,
+      required: true,
+    },
+    mimeType: {
+      type: String,
+      required: true,
+    },
+    duration: {
+      type: Number,
+    },
   },
   { _id: false }
 );
 
 const MessageSchema = new Schema<IMessage>(
   {
-    sender: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    chat: { type: Schema.Types.ObjectId, ref: "Chat", required: true },
-    content: { type: String, required: true },
-    attachments: { type: [AttachmentSchema], default: [] },
-    seenBy: { type: Schema.Types.ObjectId, ref: "User" },
+    sender: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    chat: {
+      type: Schema.Types.ObjectId,
+      ref: "Chat",
+      required: true,
+    },
+    content: {
+      type: String,
+      validate: {
+        validator: function (this: IMessage, value?: string): boolean {
+          if (this.attachments && this.attachments.length > 0) {
+            return true;
+          }
+
+          return typeof value === "string" && value.trim().length > 0;
+        },
+        message: "Content is required when there are no attachments.",
+      },
+    },
+    attachments: {
+      type: [AttachmentSchema],
+      default: [],
+    },
+    seenBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
     status: {
       type: String,
       enum: ["sent", "delivered", "read"],
@@ -53,6 +91,7 @@ const MessageSchema = new Schema<IMessage>(
   },
   { timestamps: true }
 );
+MessageSchema.index({ chat: 1, createdAt: -1 });
 
 export const Message =
   mongoose.models.Message ?? mongoose.model<IMessage>("Message", MessageSchema);

@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import { Chat } from "../model/Chat";
 import { Message } from "../model/Message";
+import { isValidObjectId } from "mongoose";
+import {
+  generateUploadURL,
+  mapMimeTypeToAttachmentType,
+} from "../util/s3Service";
 
 const getUserChats = async (req: Request, res: Response) => {
   try {
@@ -37,4 +42,100 @@ const getUserChats = async (req: Request, res: Response) => {
   }
 };
 
-export default { getUserChats };
+const getUserChatMessages = async (req: Request, res: Response) => {
+  try {
+    // Example: /chats/{chatId}/messages?limit=20&before=2023-01-01T00:00:00Z
+
+    const chatId = req.params.chatId;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+    const before = (req.query.before as string) ?? undefined;
+    const userId = req.userId;
+
+    if (!isValidObjectId(chatId)) {
+      return res.status(400).json({ message: "Invalid chatId" });
+    }
+
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: userId,
+    });
+
+    if (!chat) {
+      return res.status(403).json({
+        message: "Access denied. You are not a participant in this chat.",
+      });
+    }
+
+    const query: any = { chat: chatId };
+    if (before) query.createdAt = { $lt: new Date(before) };
+
+    const recentMessages = await Message.find(query)
+      .populate({ path: "sender", select: "name avatarUrl" })
+      .sort({ createdAt: -1 })
+      .limit(limit || 20);
+
+    return res.status(200).json(recentMessages.reverse());
+  } catch (err: any) {
+    console.log("Error get messages: " + err);
+    return res.status(500).json({ message: "Failed to fetch messages" });
+  }
+};
+
+const uploadMediaFiles = async (req: Request, res: Response) => {
+  try {
+    // Example: chats/:chatId/media/upload
+
+    const chatId = req.params.chatId;
+    const userId = req.userId;
+
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: userId,
+    });
+
+    if (!chat) {
+      return res.status(403).json({
+        message: "Access denied. You are not a participant in this chat.",
+      });
+    }
+
+    const files: { filename: string; mimeType: string; size: number }[] =
+      req.body;
+
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    const UPLOADS_PREFIX = "uploads/";
+
+    const results = await Promise.all(
+      files.map(async ({ filename, mimeType, size }) => {
+        if (!filename || !mimeType || size === undefined) {
+          return res
+            .status(400)
+            .send("Missing file metadata (filename, mimeType, size)");
+        }
+
+        if (size > MAX_FILE_SIZE) {
+          return res.status(400).send("File size exceeds limit");
+        }
+
+        const sanitizedFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, "_");
+        const objectKey = `${UPLOADS_PREFIX}${chatId}/${userId}-${Date.now()}-${sanitizedFilename}`;
+
+        const url = await generateUploadURL(objectKey, mimeType);
+
+        if (!url) {
+          return res.status(500).send("Failed to generate upload URL");
+        }
+
+        const type = mapMimeTypeToAttachmentType(mimeType);
+
+        return { filename, url, objectKey, mimeType, size, type };
+      })
+    );
+
+    res.status(200).json(results);
+  } catch (error) {
+    console.log("Error generating upload URL:", error);
+    return res.status(500).send("Error generating upload URL");
+  }
+};
+export default { getUserChats, getUserChatMessages, uploadMediaFiles };

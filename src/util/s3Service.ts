@@ -1,6 +1,7 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { s3Config } from "../config/s3Config";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { AttachmentType } from "../model/Message";
 
 const s3Client = new S3Client({
   region: s3Config.region,
@@ -15,8 +16,16 @@ export const generateUploadURL = async (key: string, contentType: string) => {
     Bucket: s3Config.bucketName,
     Key: key,
     ContentType: contentType,
-    ACL: "public-read",
   });
-  const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  const url = await getSignedUrl(s3Client, command, { expiresIn: 300 });
   return url;
+};
+
+export const mapMimeTypeToAttachmentType = (
+  mimeType: string
+): AttachmentType => {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  return "file";
 };
