@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import { Chat } from "../model/Chat";
-import { Message } from "../model/Message";
+import { IAttachment, Message } from "../model/Message";
 import { isValidObjectId } from "mongoose";
 import {
   generateUploadURL,
+  generateAccessURL,
   mapMimeTypeToAttachmentType,
 } from "../util/s3Service";
 
@@ -138,4 +139,61 @@ const uploadMediaFiles = async (req: Request, res: Response) => {
     return res.status(500).send("Error generating upload URL");
   }
 };
-export default { getUserChats, getUserChatMessages, uploadMediaFiles };
+
+const getChatMediaFiles = async (req: Request, res: Response) => {
+  try {
+    // Example: chats/:chatId/:messageId/media/view
+
+    const chatId = req.params.chatId;
+    const messageId = req.params.messageId;
+    const userId = req.userId;
+
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: userId,
+    });
+
+    if (!chat) {
+      return res.status(403).json({
+        message: "Access denied. You are not a participant in this chat.",
+      });
+    }
+
+    const message = await Message.findOne({ _id: messageId });
+
+    if (!message) {
+      return res.status(404).send("Attachment not found");
+    }
+
+    const attachment: IAttachment = message.attachment;
+
+    if (!attachment) {
+      return res.status(404).send("Attachment details incomplete");
+    }
+
+    if (!attachment.objectKey) {
+      return res.status(400).send("Missing objectKey");
+    }
+
+    const url = await generateAccessURL(
+      attachment.objectKey,
+      attachment.mimeType
+    );
+
+    if (!url) {
+      return res.status(500).send("Failed to generate access URL");
+    }
+
+    return res.status(200).json({ url });
+  } catch (error) {
+    console.error("Error generating access URL:", error);
+    return res.status(500).send("Error generating access URL");
+  }
+};
+
+export default {
+  getUserChats,
+  getUserChatMessages,
+  uploadMediaFiles,
+  getChatMediaFiles,
+};

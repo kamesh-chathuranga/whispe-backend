@@ -15,7 +15,7 @@ export interface IMessage extends Document {
   sender: Types.ObjectId;
   chat: Types.ObjectId;
   content?: string;
-  attachments?: IAttachment[];
+  attachment?: IAttachment;
   seenBy: Types.ObjectId;
   status: "sent" | "delivered" | "read";
 }
@@ -66,7 +66,7 @@ const MessageSchema = new Schema<IMessage>(
       type: String,
       validate: {
         validator: function (this: IMessage, value?: string): boolean {
-          if (this.attachments && this.attachments.length > 0) {
+          if (this.attachment) {
             return true;
           }
 
@@ -75,9 +75,9 @@ const MessageSchema = new Schema<IMessage>(
         message: "Content is required when there are no attachments.",
       },
     },
-    attachments: {
-      type: [AttachmentSchema],
-      default: [],
+    attachment: {
+      type: AttachmentSchema,
+      default: undefined,
     },
     seenBy: {
       type: Schema.Types.ObjectId,

@@ -1,4 +1,8 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { s3Config } from "../config/s3Config";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AttachmentType } from "../model/Message";
@@ -16,6 +20,16 @@ export const generateUploadURL = async (key: string, contentType: string) => {
     Bucket: s3Config.bucketName,
     Key: key,
     ContentType: contentType,
+  });
+  const url = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+  return url;
+};
+
+export const generateAccessURL = async (key: string, contentType: string) => {
+  const command = new GetObjectCommand({
+    Bucket: s3Config.bucketName,
+    Key: key,
+    ResponseContentType: contentType,
   });
   const url = await getSignedUrl(s3Client, command, { expiresIn: 300 });
   return url;

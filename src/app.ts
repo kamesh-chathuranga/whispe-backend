@@ -160,7 +160,7 @@ io.on("connection", async (socket) => {
   // Handle sending message
   socket.on("message:send", async (data: any, ack: Function) => {
     try {
-      const { chatId, content, attachments } = data;
+      const { chatId, content, attachment } = data;
       // Validate chat
       if (!isValidObjectId(chatId))
         return ack({ status: 400, error: "Invalid chatId" });
@@ -180,7 +180,7 @@ io.on("connection", async (socket) => {
         sender: userId,
         chat: chatId,
         content,
-        attachments,
+        attachment,
       });
 
       const populatedMessage = await message.populate({
