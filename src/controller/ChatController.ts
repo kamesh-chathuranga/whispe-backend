@@ -45,39 +45,41 @@ const getUserChats = async (req: Request, res: Response) => {
 
 const getUserChatMessages = async (req: Request, res: Response) => {
   try {
-    // Example: /chats/{chatId}/messages?limit=20&before=2023-01-01T00:00:00Z
-
     const chatId = req.params.chatId;
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
-    const before = (req.query.before as string) ?? undefined;
+    const limit = parseInt((req.query.limit as string) || "20", 10);
+    const before = req.query.before
+      ? new Date(req.query.before as string)
+      : undefined;
     const userId = req.userId;
 
-    if (!isValidObjectId(chatId)) {
+    if (!isValidObjectId(chatId))
       return res.status(400).json({ message: "Invalid chatId" });
-    }
 
     const chat = await Chat.findOne({
       _id: chatId,
       participants: userId,
-    });
+    }).lean();
+    if (!chat) return res.status(403).json({ message: "Access denied." });
 
-    if (!chat) {
-      return res.status(403).json({
-        message: "Access denied. You are not a participant in this chat.",
-      });
-    }
+    const filter: any = { chat: chatId };
+    if (before) filter.createdAt = { $lt: before };
 
-    const query: any = { chat: chatId };
-    if (before) query.createdAt = { $lt: new Date(before) };
-
-    const recentMessages = await Message.find(query)
-      .populate({ path: "sender", select: "name avatarUrl" })
+    // find messages, newest first, then reverse to oldest→newest
+    const docs = await Message.find(filter)
       .sort({ createdAt: -1 })
-      .limit(limit || 20);
+      .limit(limit)
+      .populate({ path: "sender", select: "name avatarUrl" })
+      .lean();
 
-    return res.status(200).json(recentMessages.reverse());
+    const messages = docs.reverse();
+    const nextCursor =
+      docs.length === limit
+        ? docs[0].createdAt.toISOString() // docs[0] is the *newest* of the batch
+        : null;
+
+    return res.json({ messages, nextCursor });
   } catch (err: any) {
-    console.log("Error get messages: " + err);
+    console.error(err);
     return res.status(500).json({ message: "Failed to fetch messages" });
   }
 };
