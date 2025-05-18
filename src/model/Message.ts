@@ -17,7 +17,7 @@ export interface IMessage extends Document {
   content?: string;
   attachment?: IAttachment;
   seenBy: Types.ObjectId;
-  status: "submit" | "sent" | "delivered" | "read" | "failed";
+  status: "pending" | "sent" | "delivered" | "read" | "failed";
 }
 
 const AttachmentSchema = new Schema<IAttachment>(
@@ -85,8 +85,8 @@ const MessageSchema = new Schema<IMessage>(
     },
     status: {
       type: String,
-      enum: ["submit", "sent", "delivered", "read", "failed"],
-      default: "submit",
+      enum: ["pending", "sent", "delivered", "read", "failed"],
+      default: "pending",
     },
   },
   { timestamps: true }

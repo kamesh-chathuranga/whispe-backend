@@ -102,40 +102,37 @@ const uploadMediaFiles = async (req: Request, res: Response) => {
       });
     }
 
-    const files: { filename: string; mimeType: string; size: number }[] =
-      req.body;
+    const file: { filename: string; mimeType: string; size: number } = req.body;
 
     const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     const UPLOADS_PREFIX = "uploads/";
 
-    const results = await Promise.all(
-      files.map(async ({ filename, mimeType, size }) => {
-        if (!filename || !mimeType || size === undefined) {
-          return res
-            .status(400)
-            .send("Missing file metadata (filename, mimeType, size)");
-        }
+    const { filename, mimeType, size } = file;
 
-        if (size > MAX_FILE_SIZE) {
-          return res.status(400).send("File size exceeds limit");
-        }
+    if (!filename || !mimeType || size === undefined) {
+      return res
+        .status(400)
+        .send("Missing file metadata (filename, mimeType, size)");
+    }
 
-        const sanitizedFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, "_");
-        const objectKey = `${UPLOADS_PREFIX}${chatId}/${userId}-${Date.now()}-${sanitizedFilename}`;
+    if (size > MAX_FILE_SIZE) {
+      return res.status(400).send("File size exceeds limit");
+    }
 
-        const url = await generateUploadURL(objectKey, mimeType);
+    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const objectKey = `${UPLOADS_PREFIX}${chatId}/${userId}-${Date.now()}-${sanitizedFilename}`;
 
-        if (!url) {
-          return res.status(500).send("Failed to generate upload URL");
-        }
+    const url = await generateUploadURL(objectKey, mimeType);
 
-        const type = mapMimeTypeToAttachmentType(mimeType);
+    if (!url) {
+      return res.status(500).send("Failed to generate upload URL");
+    }
 
-        return { filename, url, objectKey, mimeType, size, type };
-      })
-    );
+    const type = mapMimeTypeToAttachmentType(mimeType);
 
-    res.status(200).json(results);
+    const result = { filename, url, objectKey, mimeType, size, type };
+
+    return res.status(200).json(result);
   } catch (error) {
     console.log("Error generating upload URL:", error);
     return res.status(500).send("Error generating upload URL");
@@ -188,7 +185,7 @@ const getChatMediaFiles = async (req: Request, res: Response) => {
 
     return res.status(200).json({ url });
   } catch (error) {
-    console.error("Error generating access URL:", error);
+    console.log("Error generating access URL:", error);
     return res.status(500).send("Error generating access URL");
   }
 };

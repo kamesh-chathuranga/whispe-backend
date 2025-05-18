@@ -160,7 +160,7 @@ io.on("connection", async (socket) => {
   // Handle sending message
   socket.on("message:send", async (data: any, ack: Function) => {
     try {
-      const { chatId, content, attachment } = data;
+      const { chatId, content, tempId, attachment } = data;
       // Validate chat
       if (!isValidObjectId(chatId))
         return ack({ status: 400, error: "Invalid chatId" });
@@ -185,7 +185,7 @@ io.on("connection", async (socket) => {
 
       const populatedMessage = await message.populate({
         path: "sender",
-        select: "name avatarUrl", // Include other fields if needed
+        select: "name avatarUrl",
       });
 
       // Update last message
@@ -193,7 +193,7 @@ io.on("connection", async (socket) => {
       await chat.save();
 
       // Broadcast to room
-      io.to(chatId).emit("message:new", populatedMessage);
+      io.to(chatId).emit("message:new", { tempId, message: populatedMessage });
 
       // Check if recipients are online and mark delivered immediately
       const recipients = chat.participants.filter(
@@ -215,9 +215,15 @@ io.on("connection", async (socket) => {
 
       ack({ status: 201, data: message });
     } catch (err: any) {
-      console.error("message:send error", err);
+      console.log("message:send error", err);
       ack({ status: 500, error: "Internal server error" });
     }
+  });
+
+  // mark sent
+  socket.on("message:sent", async ({ messageId }) => {
+    await Message.findByIdAndUpdate(messageId, { status: "sent" });
+    io.emit("message:status", { messageId, status: "sent" });
   });
 
   // mark delivered
@@ -230,6 +236,12 @@ io.on("connection", async (socket) => {
   socket.on("message:read", async ({ messageId }) => {
     await Message.findByIdAndUpdate(messageId, { status: "read" });
     io.emit("message:status", { messageId, status: "read" });
+  });
+
+  // mark failed
+  socket.on("message:failed", async ({ messageId }) => {
+    await Message.findByIdAndUpdate(messageId, { status: "failed" });
+    io.emit("message:status", { messageId, status: "failed" });
   });
 
   // Handle calling
