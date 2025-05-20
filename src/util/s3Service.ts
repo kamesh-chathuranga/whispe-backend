@@ -31,7 +31,7 @@ export const generateAccessURL = async (key: string, contentType: string) => {
     Key: key,
     ResponseContentType: contentType,
   });
-  const url = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+  const url = await getSignedUrl(s3Client, command, { expiresIn: 1800 });
   return url;
 };
 

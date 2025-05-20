@@ -239,10 +239,10 @@ io.on("connection", async (socket) => {
   });
 
   // mark failed
-  socket.on("message:failed", async ({ messageId }) => {
-    await Message.findByIdAndUpdate(messageId, { status: "failed" });
-    io.emit("message:status", { messageId, status: "failed" });
-  });
+  // socket.on("message:failed", async ({ messageId }) => {
+  //   await Message.findByIdAndUpdate(messageId, { status: "failed" });
+  //   io.emit("message:status", { messageId, status: "failed" });
+  // });
 
   // Handle calling
   socket.on("call", async (data: any, ack: Function) => {
