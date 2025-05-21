@@ -42,7 +42,7 @@ const io = new Server(httpServer, {
 // track online users
 const onlineUsers = new Set<string>();
 
-// Socket.IO auth middleware
+// Auth middleware
 io.use((socket: Socket, next) => {
   try {
     const cookies = socket.request.headers.cookie;
@@ -59,7 +59,7 @@ io.use((socket: Socket, next) => {
     socket.data.userId = payload.userId;
     next();
   } catch (err) {
-    next(new Error("Authentication error"));
+    next(new Error("AUTHENTICATION_ERROR"));
   }
 });
 
@@ -73,7 +73,6 @@ io.on("connection", async (socket) => {
 
   // Update message status for pending messages when user comes online
   try {
-    // Find chats where this user is a participant
     const userChats = await Chat.find({
       participants: mongoose.Types.ObjectId.createFromHexString(userId),
     }).select("_id");
@@ -92,12 +91,13 @@ io.on("connection", async (socket) => {
     for (const message of pendingMessages) {
       await Message.findByIdAndUpdate(message._id, { status: "delivered" });
       io.emit("message:status", {
+        chatId: message.chat,
         messageId: message._id,
         status: "delivered",
       });
     }
   } catch (err) {
-    console.error("Error updating message status on user connection:", err);
+    console.log("Error updating message status on user connection:", err);
   }
 
   const user = await User.findById(userId).select("friends");
@@ -161,7 +161,7 @@ io.on("connection", async (socket) => {
   socket.on("message:send", async (data: any, ack: Function) => {
     try {
       const { chatId, content, tempId, attachment } = data;
-      // Validate chat
+
       if (!isValidObjectId(chatId))
         return ack({ status: 400, error: "Invalid chatId" });
 
@@ -175,13 +175,14 @@ io.on("connection", async (socket) => {
       )
         return ack({ status: 403, error: "Not a participant" });
 
-      // Create message
       const message = await Message.create({
         sender: userId,
         chat: chatId,
         content,
         attachment,
       });
+
+      let messageForAck = message;
 
       const populatedMessage = await message.populate({
         path: "sender",
@@ -203,17 +204,27 @@ io.on("connection", async (socket) => {
       for (const recipient of recipients) {
         const recipientId = recipient.toString();
         if (onlineUsers.has(recipientId)) {
-          // Update status to delivered if recipient is online
-          await Message.findByIdAndUpdate(message._id, { status: "delivered" });
-          io.emit("message:status", {
-            messageId: message._id,
-            status: "delivered",
-          });
-          break; // Only need to update once for any online recipient
+          const updatedMessage = await Message.findByIdAndUpdate(
+            message._id,
+            {
+              status: "delivered",
+            },
+            { new: true }
+          );
+
+          if (updatedMessage) {
+            messageForAck = updatedMessage;
+            io.emit("message:status", {
+              chatId: updatedMessage.chat,
+              messageId: message._id,
+              status: "delivered",
+            });
+          }
+          break;
         }
       }
 
-      ack({ status: 201, data: message });
+      ack({ status: 201, data: messageForAck });
     } catch (err: any) {
       console.log("message:send error", err);
       ack({ status: 500, error: "Internal server error" });
@@ -222,20 +233,38 @@ io.on("connection", async (socket) => {
 
   // mark sent
   socket.on("message:sent", async ({ messageId }) => {
-    await Message.findByIdAndUpdate(messageId, { status: "sent" });
-    io.emit("message:status", { messageId, status: "sent" });
+    const message = await Message.findByIdAndUpdate(messageId, {
+      status: "sent",
+    });
+    io.emit("message:status", {
+      messageId,
+      status: "sent",
+      chatId: message.chat,
+    });
   });
 
   // mark delivered
   socket.on("message:delivered", async ({ messageId }) => {
-    await Message.findByIdAndUpdate(messageId, { status: "delivered" });
-    io.emit("message:status", { messageId, status: "delivered" });
+    const message = await Message.findByIdAndUpdate(messageId, {
+      status: "delivered",
+    });
+    io.emit("message:status", {
+      messageId,
+      status: "delivered",
+      chatId: message.chat,
+    });
   });
 
   // mark read
   socket.on("message:read", async ({ messageId }) => {
-    await Message.findByIdAndUpdate(messageId, { status: "read" });
-    io.emit("message:status", { messageId, status: "read" });
+    const message = await Message.findByIdAndUpdate(messageId, {
+      status: "read",
+    });
+    io.emit("message:status", {
+      messageId,
+      status: "read",
+      chatId: message.chat,
+    });
   });
 
   // mark failed
@@ -248,7 +277,7 @@ io.on("connection", async (socket) => {
   socket.on("call", async (data: any, ack: Function) => {
     try {
       const { caller, receiver } = data;
-      // Validate chat
+
       if (!isValidObjectId(caller._id))
         return ack({ status: 400, error: "Invalid callerId" });
 
