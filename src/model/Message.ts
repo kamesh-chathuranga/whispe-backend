@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
-export type AttachmentType = "image" | "audio" | "video" | "file";
+export type AttachmentType = "image" | "audio" | "video" | "file" | "voice";
 
 export interface IAttachment {
   objectKey: string;
@@ -29,7 +29,7 @@ const AttachmentSchema = new Schema<IAttachment>(
     type: {
       type: String,
       required: true,
-      enum: ["image", "audio", "video", "file"],
+      enum: ["image", "audio", "video", "file", "voice"],
     },
     filename: {
       type: String,
