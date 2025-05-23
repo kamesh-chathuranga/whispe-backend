@@ -72,4 +72,5 @@ jobs:
             -e REFRESH_TOKEN_EXPIRATION="${{ secrets.REFRESH_TOKEN_EXPIRATION }}" \
             -e ENCRYPTION_KEY="${{ secrets.ENCRYPTION_KEY }}" \
             -e FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
+            -e AWS_REGION="${{ secrets.AWS_REGION }}" \
             "$IMAGE"
